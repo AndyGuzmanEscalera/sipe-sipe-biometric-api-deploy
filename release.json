@@ -1,0 +1,8 @@
+{
+    "release":  "qa-46fd69eee18e",
+    "source_sha":  "46fd69eee18e3b7c129ae7fe42ac7be48309a071",
+    "source_branch":  "develop",
+    "build_date":  "2026-11-11T17:02:27.1367976+00:00",
+    "status":  "prepared",
+    "notes":  "Runtime copiado desde sipe-sipe-biometric-api en develop; sin despliegue ni publicacion."
+}

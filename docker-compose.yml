@@ -1,0 +1,44 @@
+name: sipe-biometric-api-deploy
+
+services:
+  api:
+    build:
+      context: ./backend
+    image: sipe-sipe-biometric-api:${RELEASE_VERSION:-local}
+    container_name: ${BIOMETRIC_CONTAINER:-sipe_biometric_api}
+    restart: unless-stopped
+    init: true
+    user: '10001:10001'
+    working_dir: /app
+    env_file:
+      - path: ${RUNTIME_ENV_FILE:-.env}
+        format: raw
+    environment:
+      APP_ENV: ${APP_ENV:-qa}
+      PYTHONDONTWRITEBYTECODE: '1'
+    # La aplicación escucha en 0.0.0.0:8000 dentro del contenedor; el puerto se
+    # publica sólo en loopback del host. Nunca se abre en el router.
+    command: [uvicorn, app.main:app, --host, 0.0.0.0, --port, '8000', '--no-proxy-headers']
+    ports:
+      - '127.0.0.1:${BIOMETRIC_API_PORT:-8200}:8000'
+    # El puerto 4370 del biométrico NO se publica: la conexión es saliente
+    # desde el contenedor hacia ${BIOMETRIC_HOST}:${BIOMETRIC_PORT}.
+    read_only: true
+    tmpfs: ['/tmp:rw,nosuid,nodev,size=64m']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    healthcheck:
+      test: [CMD, python, -B, -c, 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=4)); raise SystemExit(0 if d.get("status")=="ok" else 1)']
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    stop_grace_period: 30s
+    networks:
+      # Red bridge con salida a Internet/LAN: el contenedor debe poder alcanzar
+      # el biométrico en 192.168.30.90:4370. No se marca `internal: true`.
+      edge:
+
+networks:
+  edge:
+    driver: bridge
