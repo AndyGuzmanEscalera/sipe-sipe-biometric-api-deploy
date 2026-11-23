@@ -1,6 +1,6 @@
 FROM python:3.12-slim-bookworm
-ARG SOURCE_REVISION=46fd69eee18e3b7c129ae7fe42ac7be48309a071
-ARG RELEASE_VERSION=qa-46fd69eee18e
+ARG SOURCE_REVISION=632b7e0e0c687606ad62e675802b976a13252505
+ARG RELEASE_VERSION=qa-632b7e0e0c68
 LABEL org.opencontainers.image.source="https://github.com/AndyGuzmanEscalera/sipe-sipe-biometric-api" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       org.opencontainers.image.version="${RELEASE_VERSION}"

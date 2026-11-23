@@ -76,7 +76,11 @@ class AttendanceFilters(BaseModel):
 
 
 class AttendanceResponse(BaseModel):
-    """Pagina de marcaciones con los totales del conjunto filtrado."""
+    """Pagina de marcaciones con los totales del conjunto filtrado.
+
+    `snapshot_id` identifica el conjunto temporal del que proviene la pagina.
+    El consumidor debe reenviarlo en las paginas siguientes.
+    """
 
     device_id: str
     filters: AttendanceFilters
@@ -85,6 +89,7 @@ class AttendanceResponse(BaseModel):
     limit: int
     count: int
     records: list[AttendanceRecord]
+    snapshot_id: str | None = None
 
 
 class AttendanceQueryParams(BaseModel):

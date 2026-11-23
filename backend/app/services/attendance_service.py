@@ -1,8 +1,12 @@
-﻿"""Filtro, orden y paginacion de las marcaciones descargadas del dispositivo.
+﻿"""Filtro, orden y paginacion estable de las marcaciones.
 
 El equipo no soporta consultas por rango ni por usuario en el protocolo, asi que
-el historico se descarga completo y se filtra en memoria. El resultado es
-determinista: el mismo historico con los mismos filtros produce la misma pagina.
+el historico se descarga completo y se filtra en memoria.
+
+Para que la paginacion sea estable, la primera peticion de una consulta lee el
+dispositivo una sola vez y guarda el conjunto filtrado y ordenado en un snapshot
+temporal. Las paginas siguientes reutilizan ese snapshot: no vuelven a leer el
+dispositivo y mantienen exactamente el mismo `total`.
 """
 from __future__ import annotations
 
@@ -10,6 +14,8 @@ import logging
 from dataclasses import dataclass
 from datetime import date as DateType
 from typing import Any, Sequence
+
+from app.services.snapshots import AttendanceSnapshot, SnapshotStore, get_snapshot_store
 
 logger = logging.getLogger("app.attendance")
 
@@ -42,6 +48,8 @@ class AttendancePage:
     offset: int
     limit: int
     records: list[dict[str, Any]]
+    snapshot_id: str | None = None
+    filters: dict[str, Any] | None = None
 
     @property
     def count(self) -> int:
@@ -79,32 +87,76 @@ def matches(record: dict[str, Any], query: AttendanceQuery) -> bool:
     return True
 
 
-class AttendanceService:
-    """Aplica filtros y paginacion sobre el historico descargado."""
+def describe_filters(query: AttendanceQuery) -> dict[str, Any]:
+    """Filtros de la consulta en forma serializable, para el snapshot."""
+    return {
+        "date": query.date.isoformat() if query.date else None,
+        "from": query.from_date.isoformat() if query.from_date else None,
+        "to": query.to_date.isoformat() if query.to_date else None,
+        "ci": query.ci,
+    }
 
-    def __init__(self, reader: Any) -> None:
+
+class AttendanceService:
+    """Filtra, ordena y pagina las marcaciones con snapshots estables."""
+
+    def __init__(self, reader: Any, store: SnapshotStore | None = None) -> None:
         self.reader = reader
+        self.store = store if store is not None else get_snapshot_store()
 
     def query(self, query: AttendanceQuery) -> AttendancePage:
+        """Primera pagina: lee el dispositivo una vez y crea el snapshot.
+
+        Las paginas siguientes deben reutilizar el `snapshot_id` devuelto.
+        """
         downloaded = self.reader.attendance()
         filtered = [record for record in downloaded if matches(record, query)]
         filtered.sort(key=sort_key)
-        total = len(filtered)
-        page = filtered[query.offset : query.offset + query.limit]
+        filters = describe_filters(query)
+        snapshot = self.store.create(filtered, filters=filters)
+        page = snapshot.page(query.offset, query.limit)
         logger.info(
-            "attendance_query device_id=%s date=%s from=%s to=%s ci=%s downloaded=%s filtered=%s returned=%s offset=%s limit=%s",
+            "attendance_query device_id=%s date=%s from=%s to=%s ci=%s downloaded=%s filtered=%s returned=%s offset=%s limit=%s snapshot_id=%s",
             getattr(self.reader.settings, "biometric_device_id", None),
             query.date,
             query.from_date,
             query.to_date,
             query.ci,
             len(downloaded),
-            total,
+            snapshot.total,
             len(page),
             query.offset,
             query.limit,
+            snapshot.snapshot_id,
         )
-        return AttendancePage(total=total, offset=query.offset, limit=query.limit, records=page)
+        return AttendancePage(
+            total=snapshot.total,
+            offset=query.offset,
+            limit=query.limit,
+            records=page,
+            snapshot_id=snapshot.snapshot_id,
+            filters=snapshot.filters,
+        )
+
+    def page(self, snapshot: AttendanceSnapshot, offset: int, limit: int) -> AttendancePage:
+        """Pagina siguiente: reutiliza el snapshot sin leer el dispositivo."""
+        page = snapshot.page(offset, limit)
+        logger.info(
+            "attendance_snapshot_page snapshot_id=%s total=%s returned=%s offset=%s limit=%s",
+            snapshot.snapshot_id,
+            snapshot.total,
+            len(page),
+            offset,
+            limit,
+        )
+        return AttendancePage(
+            total=snapshot.total,
+            offset=offset,
+            limit=limit,
+            records=page,
+            snapshot_id=snapshot.snapshot_id,
+            filters=snapshot.filters,
+        )
 
     def users(self) -> Sequence[dict[str, Any]]:
         return self.reader.users()

@@ -47,6 +47,10 @@ class Settings(BaseSettings):
 
     attendance_default_limit: int = 500
     attendance_max_limit: int = 5000
+    # Paginacion estable: cada consulta conserva su conjunto filtrado en memoria
+    # durante este TTL. El numero de snapshots simultaneos esta acotado.
+    attendance_snapshot_ttl: int = 300
+    attendance_snapshot_max: int = 8
 
     @field_validator("biometric_host")
     @classmethod
@@ -109,6 +113,20 @@ class Settings(BaseSettings):
     def _validate_max_limit(cls, value: int) -> int:
         if value < 1:
             raise ValueError("ATTENDANCE_MAX_LIMIT debe ser al menos 1.")
+        return value
+
+    @field_validator("attendance_snapshot_ttl")
+    @classmethod
+    def _validate_snapshot_ttl(cls, value: int) -> int:
+        if not 1 <= value <= 3600:
+            raise ValueError("ATTENDANCE_SNAPSHOT_TTL debe estar entre 1 y 3600 segundos.")
+        return value
+
+    @field_validator("attendance_snapshot_max")
+    @classmethod
+    def _validate_snapshot_max(cls, value: int) -> int:
+        if not 1 <= value <= 256:
+            raise ValueError("ATTENDANCE_SNAPSHOT_MAX debe estar entre 1 y 256.")
         return value
 
     @property

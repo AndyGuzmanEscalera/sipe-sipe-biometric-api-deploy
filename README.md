@@ -154,6 +154,8 @@ Todas están documentadas en `.env.example`. Las que importan:
 | `BIOMETRIC_API_TOKEN` | sí | token Bearer; mínimo 32 caracteres |
 | `ATTENDANCE_DEFAULT_LIMIT` | no | `500` |
 | `ATTENDANCE_MAX_LIMIT` | no | `5000` |
+| `ATTENDANCE_SNAPSHOT_TTL` | no | segundos que vive un snapshot de consulta en memoria (`300`) |
+| `ATTENDANCE_SNAPSHOT_MAX` | no | número máximo de snapshots simultáneos, con evicción LRU (`8`) |
 | `APP_ENV` | sí | `qa`, `production` o `development` |
 | `LOG_LEVEL` | no | `INFO` |
 | `BIOMETRIC_ENABLE_DOCS` | no | `false` |
